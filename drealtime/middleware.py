@@ -10,7 +10,7 @@ class iShoutCookieMiddleware(object):
     call the iShout.js API interface and get a token
     for the currently logged-in user.
     set the token received from the API as a cookie.
-    
+
     Put this before `AuthenticationMiddleware`.
     """
     def get_token(self, request):
@@ -39,7 +39,7 @@ class iShoutCookieMiddleware(object):
         cookie_path = self.determine_path(request)
         cookie_domain = self.determine_domain(request)
         ishout_cookie_value = self.get_token(request)
-        
+
         # calculate expiry
         cookie_age = datetime.timedelta(seconds=settings.SESSION_COOKIE_AGE)
 
@@ -61,11 +61,40 @@ class iShoutCookieMiddleware(object):
         )
         return response
 
+    def modify_ishout_cookie_if_needed(self, request, response):
+        current_token = self.get_token(request)
+        old_cookie_value = request.COOKIES.get(ishout_cookie_name)
+
+        if current_token != old_cookie_value:
+            cookie_path = self.determine_path(request)
+            cookie_domain = self.determine_domain(request)
+
+            # calculate expiry
+            cookie_age = datetime.timedelta(seconds=settings.SESSION_COOKIE_AGE)
+
+            utc_date = datetime.datetime.utcnow()
+            cookie_date_str = '%a, %d-%b-%Y %H:%M:%S GMT'
+            expires = datetime.datetime.strftime(
+                utc_date + cookie_age, cookie_date_str
+            )
+
+            # Set the cookie. use the same path, domain and expiry
+            # as the cookie set for the session.
+            response.set_cookie(
+                ishout_cookie_name,
+                current_token,
+                max_age=settings.SESSION_COOKIE_AGE,
+                expires=expires,
+                path=cookie_path,
+                domain=cookie_domain
+            )
+        return response
+
     def process_response(self, request, response):
         # We only use it for authenticated users
         if not hasattr(request, 'user'):
             return response
-            
+
         if not request.user.is_authenticated() and \
         ishout_cookie_name in request.COOKIES:
             # If there is no authenticated user attached to this request,
@@ -77,13 +106,14 @@ class iShoutCookieMiddleware(object):
                 ishout_cookie_name, path=path, domain=domain
             )
             return response
-        
+
         # skip unauthenticated users
         if not request.user.is_authenticated():
             return response
 
         # Check if we have the cookie already set:
         if self.has_ishout_cookie(request):
+            self.modify_ishout_cookie_if_needed(request, response)
             return response
 
         # If not, set it.
