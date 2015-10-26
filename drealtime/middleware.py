@@ -18,7 +18,8 @@ class iShoutCookieMiddleware(object):
         use the HTTP client to get a token from the iShout.js server,
         for the currently logged in user.
         """
-        res = ishout_client.get_token(request.user.pk)
+        uid = '{0}{1}'.format(request.user.pk, settings.C2L_ENV or '')
+        res = ishout_client.get_token(uid)
         return res
 
     def has_ishout_cookie(self, request):
