@@ -18,7 +18,7 @@ class iShoutCookieMiddleware(object):
         use the HTTP client to get a token from the iShout.js server,
         for the currently logged in user.
         """
-        uid = '{0}{1}'.format(request.user.pk, settings.C2L_ENV or '')
+        uid = '{0}{1}'.format(request.user.pk, getattr(settings, 'C2L_ENV', ''))
         res = ishout_client.get_token(uid)
         return res
 
